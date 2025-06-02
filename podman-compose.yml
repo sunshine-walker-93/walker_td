@@ -1,0 +1,82 @@
+version: '3.8'
+services:
+  nginx:
+    image: docker.io/library/nginx
+    platform: linux/arm64
+    container_name: nginx
+    restart: always
+    ports:
+      - 8080:80
+      - 8443:443
+    command:
+    volumes:
+      - /var/lib/containers/storage/volumes/nginx/config/nginx.conf:/etc/nginx/nginx.conf
+      - /var/lib/containers/storage/volumes/nginx/config/conf.d:/etc/nginx/conf.d
+      - /var/lib/containers/storage/volumes/nginx/html:/usr/share/nginx/html
+      - /var/lib/containers/storage/volumes/nginx/logs:/var/log/nginx
+
+  mysql:
+    image: mysql:8.3
+    platform: linux/arm64
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - /var/lib/containers/storage/volumes/mysql/conf:/etc/mysql/conf.d
+      - /var/lib/containers/storage/volumes/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - 9306:3306
+    user: "1000:1000"
+    command: --user=mysql
+
+  redis:
+    image: redis:7
+    platform: linux/arm64
+    container_name: redis
+    command: redis-server --appendonly yes --requirepass '123456'    #开启持久化的支持并设置认证密码
+    restart: always                           #跟随docker的启动而启动
+    volumes:
+      - redis_data:/data              #数据文件挂载
+    ports:
+      - 6379:6379
+  
+  etcd:
+     image: bitnami/etcd:latest
+     platform: linux/arm64
+     container_name: etcd
+     volumes:
+       - etcd_data:/bitnami/etcd/data
+     environment:
+       - ALLOW_NONE_AUTHENTICATION=yes
+       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+     ports:
+       - 2379:2379
+       - 2380:2380
+
+  etcd_view:
+    image: docker.io/joinsunsoft/etcdv3-browser
+    container_name: etcd_view
+    ports:
+      - 9080:80
+      - 9443:443
+    depends_on:
+      - etcd
+
+  walker_gateway:
+    image: docker.io/cheerfulliqiang/walker-gateway:v2
+    platform: linux/arm64
+    container_name: walker_gateway
+    restart: always
+    ports:
+      - 8101:8101
+    depends_on:
+      - mysql
+      - redis
+      - etcd
+
+volumes:
+  mysql_data:
+  redis_data:
+  etcd_data:
